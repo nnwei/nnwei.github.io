@@ -1,0 +1,66 @@
+---
+layout: post
+title:  "The Dark Sky Project"
+date:   2016-01-26 13:55:56 -0800
+categories: jekyll update
+---
+## Project background
+
+On the largest scales, the universe is populated by clusters of galaxies, connected by filaments, bordering cosmic voids. The statistics of the distribution of these structures can be used in a variety of methods to constrain fundamental cosmological parameters. For example, the number of objects in the Universe of a given mass, the mass function, is sensitive to cosmological parameters such as the matter density, the initial power spectrum of density fluctuations, and the dark energy equation of state. Especially for very massive clusters (above 1015 solar masses) the mass function is a sensitive probe of cosmology. For these reasons, the mass function is a major target of current observational programs. Precisely modeling the mass function at these scales is an enormous challenge for numerical simulations, since both statistical and systematic errors conspire to prevent the emergence of an accurate theoretical model. The dynamic range in mass and convergence tests necessary to model systematic errors requires multiple simulations at different resolutions, since even a 10^12 particle simulation does not have sufficient statistical power by itself.
+
+While galaxies and clusters of galaxies account for large concentrations of mass, cosmic voids that grow from regions of local divergence are the underdense regions that comprise most of the volume in the Universe. Voids are only observed in the galaxy distributions, and galaxies are sparse, biased tracers of the underlying dark matter. However, voids are typically studied from a theoretical perspective only in dark matter N-body simulations. The identification of voids is sensitive to survey density and geometry in a highly non-trivial fashion; to make direct contact with observed voids we must perform large-volume, high-resolution simulations to capture the structure and dynamics of dark matter, map the dark matter to a galaxy population, place the galaxies on a lightcone, apply realistic survey masks, and identify and characterize the voids.
+
+This is where Dark Sky comes in, hoping to shed some light on the situation, so to speak, by rendering the interactions between dark matter and dark energy visible. 
+
+In short, the Dark Sky Simulations are an ongoing series of cosmological N-body simulations designed to
+provide a quantitative and accessible model of the evolution of the large-scale Universe. Such models
+are essential for many aspects of the study of dark matter and dark energy, due to a lack of sufficiently
+accurate analytic model of non-linear gravitational clustering.
+
+## Implementation
+
+### Basic settings
+
+The team used data collected from the Planck and WMAP spacecraft, probes which were launched to measure temperature fluctuations in the cosmic microwave background, the leftover thermal radiation from the Big Bang. The data collected by these spacecraft was used to set the initial conditions for the Dark Sky simulation.
+
+Once these initial conditions were determined, the team plugged in the code that accounts for gravitational force and watched to see how particles interact. By the time the team was ready to run their Dark Sky simulations last year, they were operating with particles on the order of 10^12.
+
+Due to the fact that the Dark Sky simulations were using 1 trillion particles, they had to make their "box" sufficiently large enough to handle the particles without messing up the gravitational dynamics. The result was a massive box which measures 8 gigaparsecs, about 25 billion light years, on each side.
+
+### Hardware and Software
+
+The Dark Sky team managed to secure the use of Oak Ridge National Laboratory’s Titan, the second most powerful supercomputer in existence, for 80 million computing hours with a grant through the US Department of Energy.
+
+The group made use of two-thirds of Titan’s nodes for the ds14 simulation above, using up 10 million cpu hours over the course of 33 hours in April of 2014. After all 80 million cpu hours were exhausted by the team in December of 2014 and resulted in a total of 500-terabytes of simulation data.
+
+The complete Titan Cray XK7 system (Bland 2012) at Oak Ridge National Laboratory contains 18,688 compute
+nodes, each containing a 16-core 2200 MHz AMD Opteron 6274 with 32 GB of 1600 MHz DDR3 memory, paired across a PCI-Express 2.0 bus with an NVIDIA Tesla K20x GPU with 6 GB of memory. The Cray Gemini interconnect (Alverson et al. 2010) provides roughly 8 Gbytes/sec of bi-directional bandwidth per node at the hardware level, with MPI latencies quoted as 1.5 microseconds or less. Titan host nodes currently run the SUSE Linux Enterprise Server 11 SP1 (x86 64) with current kernel 2.6.32.59. Processing nodes run Cray’s Compute Node Linux, designed to minimize interference between operating system services and application scalability.
+
+All software was compiled with system installed gcc version 4.8.2, with the addition of NVIDIA’s LLVM-based nvcc V5.5.0 for two CUDA-specific files. Significant software dependencies used via the system modules interface include cray-mpich/6.2.0, fftw/3.3.0.3 and gsl/1.16. Additional packages were installed including gdb 7.6.90, Mercurial, git 1.8.5, Python 2.7.6, MPI for Python, Cython, Numpy and matplotlib.
+
+### Algorithm and implementation
+
+The codes undergirding the simulation began with Dark Sky’s lead investigator Michael Warren of the Los Alamos National Laboratory in the late 80s, namely 2HOT, although then the algorithm wasn’t specifically designed for Dark Sky. Warren’s codes have been used in a number of cosmological simulations throughout the years, their complexity only limited by the computing power available.
+
+2HOT is an adaptive treecode N-body method whose operation count scales as NlogN in the number of particles. Almost 30 years ago, the field of N-body simulations was revolutionized by the introduction of methods which allow N-body simulations to be performed on arbitrary collections of bodies in a time much less than O(N2). They have in common the use of a truncated expansion to approximate the contribution of many bodies with a single interaction. The resulting complexity is usually determined to be O(N) or O(NlogN), which allows computations using orders of magnitude more particles. These methods represent a system of N bodies in a hierarchical manner by the use of a spatial tree data structure. Aggregations of bodies at various levels of detail form the internal nodes of the tree (cells). These methods obtain greatly increased efficiency by approximating the forces on particles. Properly used, these methods do not contribute significantly to the total solution error. Treecodes offer the best computational efficiency when force resolution at small scales is important. 2HOT is distinguished from other current cosmology simulation approaches at the petascale by not having a particle-mesh component, using a pure treecode avoiding the potentially problematic transition scale between PM and tree forces inherent with TreePM approaches, and offering additional flexibility for high-resolution simulations with a large dynamic range in particle masses.
+
+The 2HOT code is written in the C programming language. A variety of gcc extensions are utilized, the most important of which is the vector_size attribute, which directs the compiler to use SSE or AVX vector instructions on Intel architectures. Using gcc with vector_size has eliminated the need to write the gravitational inner loops in assembly language to obtain good performance on CPU-only architectures.  The GPU portions of the code include both CUDA and OpenCL, with the CUDA versions performing somewhat better at present. A purely message-passing programming model is implemented in MPI. In order to hide latency, the tree-traversal phase uses an active message abstraction implemented inside MPI with a “asynchronous batched messages” routines.
+
+Treecodes place heavy demands on the various subsystems of modern parallel computers. This results in very poor performance for algorithms which have been designed without careful consideration of message latency, memory bandwidth, instruction-level parallelism and the limitations inherent in deep memory hierarchies. They use the dual-tree traversal as a key component of the initial approach to increase the instruction-level parallelism in the code to better enable GPU architectures. It is also relevant to a number of data analysis tasks, such as neighbor-finding and computing correlation functions.
+
+In this earlier work they used the fact that particles which are spatially near each other tend to have very similar cell interaction lists. By updating the particles in an order which takes advantage of their spatial proximity, they improved the performance of the memory hierarchy.
+
+Going beyond this optimization with dual-tree traversal, they also bundled a set of m source cells which have interactions in common with a set of n sink particles (contained within a sink cell), and perform the full m × n interactions on this block. This further improves cache behavior on CPU architectures, and enables a simple way for GPU co-processors to provide reasonable speedup, even in the face of limited peripheral bus bandwidth.
+
+Furthermore, they bundled multiple particles with a single interaction list to increase the computational intensity. This allows the full GPU performance to be sustained without being severely limited from PCI-Express bandwidth. They achieve this by packaging 200 or more particles with the same interaction list and sending them to the GPU. 
+
+The most scientifically relevant metric for evaluating gravitational N-body simulations is not Petaflops, but how many particles are updated per second, at an accuracy sufficient to accurately represent the physics involved. In 1997, the same team obtained a performance of 3 million particles updated per second at an RMS force accuracy better than 10−3. Their current performance results are about 8 billion particles per second, with an equivalent force accuracy about 10 times better. Whether this accuracy is sufficient, or if accuracy can be sacrificed without adversely affecting the scientific results, is an area of current research.
+
+
+### Intermedia results
+
+
+## Reference
+
+
+
